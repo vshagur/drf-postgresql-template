@@ -15,8 +15,8 @@ DJANGO_MANAGE = python manage.py
 RUN_TEST_COMMAND = $(SHELL) tests/run_tests.sh
 # RUN_TEST_COMMAND = $(DJANGO_MANAGE) test
 
-.PHONY : bash build check_upgrade chown help makemigrations migrate psql rebuild run \
-shell start startapp stop test
+.PHONY : bash build check_upgrade chown clean createsuperuser help init logs \
+	makemigrations migrate psql rebuild run shell start startapp stop test
 
 .DEFAULT_GOAL : help
 
@@ -33,9 +33,26 @@ check_upgrade: ## сheck packages version from requirements.txt
 chown: ## change
 	$ sudo chown -R $(USER):$(USER) .
 
+clean: chown ##
+	$ rm  -rf $(DB)/data
+	$ docker-compose rm -sfv
+	$ docker container prune -f
+	$ docker volume prune -f
+
+createsuperuser: ## Start Django shell into container
+	$ $(RUN_COMMAND) $(WEB) $(DJANGO_MANAGE) createsuperuser \
+	--noinput --username $(DJANGO_SUPERUSER_USERNAME) \
+	--email $(DJANGO_SUPERUSER_EMAIL)
+
 help: ## Show this help
 	@printf "\033[33m%s:\033[0m\n" 'Available commands'
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[32m%-14s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+init: build makemigrations migrate createsuperuser##
+	echo -e "Initializing a project from a template ... \033[32mdone\033[m"
+
+logs: ##
+	$ docker-compose logs -f
 
 makemigrations: ## run makemigrations into container
 	$ $(RUN_COMMAND) $(WEB) $(DJANGO_MANAGE) makemigrations
@@ -44,7 +61,7 @@ makemigrations: ## run makemigrations into container
 migrate: ## run migrate into container
 	$ $(RUN_COMMAND) $(WEB) $(DJANGO_MANAGE) migrate
 
-psql: ## Run psql into container (the container must be running )
+psql: ## Run psql into container (the container web must be running )
 	$ docker-compose exec -u postgres $(DB) psql
 
 rebuild: ## Rebuild app container
@@ -70,7 +87,3 @@ stop: ## Stop app into container (daemon mode)
 
 test: ## Run test into container
 	$ $(RUN_COMMAND) $(WEB) $(RUN_TEST_COMMAND)
-
-#init: build startproject##
-#	echo "init project"
-
