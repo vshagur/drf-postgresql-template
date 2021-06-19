@@ -9,10 +9,11 @@ SHELL = /bin/bash
 WEB = web
 APPS = api
 DB = db
+TESTS = tests
 RUN_COMMAND = docker-compose run --rm
 PROJECT = ${PWD##*/}
 DJANGO_MANAGE = python manage.py
-RUN_TEST_COMMAND = $(SHELL) tests/run_tests.sh
+RUN_TEST_COMMAND = $(SHELL) $(TESTS)/run_tests.sh
 # RUN_TEST_COMMAND = $(DJANGO_MANAGE) test
 
 .PHONY : bash build check_upgrade chown clean createsuperuser help init logs \
@@ -20,7 +21,9 @@ RUN_TEST_COMMAND = $(SHELL) tests/run_tests.sh
 
 .DEFAULT_GOAL : help
 
-# This will output the help for each task. thanks to https://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
+# This will output the help for each task. thanks to
+# https://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
+
 bash: ## Start bash into container
 	$ $(RUN_COMMAND) $(WEB) /bin/bash
 
@@ -36,8 +39,6 @@ chown: ## change
 clean: chown ##
 	$ rm  -rf $(DB)/data
 	$ docker-compose rm -sfv
-	$ docker container prune -f
-	$ docker volume prune -f
 
 createsuperuser: ## Start Django shell into container
 	$ $(RUN_COMMAND) $(WEB) $(DJANGO_MANAGE) createsuperuser \
@@ -57,17 +58,14 @@ logs: ##
 makemigrations: ## run makemigrations into container
 	$ $(RUN_COMMAND) $(WEB) $(DJANGO_MANAGE) makemigrations
 
-
 migrate: ## run migrate into container
 	$ $(RUN_COMMAND) $(WEB) $(DJANGO_MANAGE) migrate
 
 psql: ## Run psql into container (the container web must be running )
 	$ docker-compose exec -u postgres $(DB) psql
 
-rebuild: ## Rebuild app container
-	$ docker-compose down -t 5
-	$ sudo chown -R $(USER):$(USER) .
-	$ docker-compose up --build $(WEB)
+rebuild: stop chown build ## Rebuild app container
+	echo -e "Rebuilding the container image ... \033[32mdone\033[m"
 
 run: ## Start app into container (interactive mode)
 	$ docker-compose up
@@ -79,11 +77,13 @@ start: ## Start app into container (daemon mode)
 	$ docker-compose up -d
 
 startapp: ## create django app, expample: $ make startapp app=app_name
-	$ $(RUN_COMMAND) $(WEB) $(DJANGO_MANAGE) startapp $(app) $(APPS)/$(app)
+	$ $(RUN_COMMAND) $(WEB) $(DJANGO_MANAGE) startapp $(app)
+	$ $(RUN_COMMAND) $(WEB) mkdir $(TESTS)/$(app)
+	$ $(RUN_COMMAND) $(WEB) mv $(app)/tests.py -t $(TESTS)/$(app)
 	$ sudo chown -R $(USER):$(USER) $(WEB)
 
 stop: ## Stop app into container (daemon mode)
-	$ docker-compose down
+	$ docker-compose down -t 5
 
 test: ## Run test into container
 	$ $(RUN_COMMAND) $(WEB) $(RUN_TEST_COMMAND)

@@ -9,4 +9,4 @@ RUN pip install pip --upgrade \
 
 ENV PYTHONPATH "${PYTHONPATH}:./"
 
-COPY . /code/
+COPY ./web /code/
