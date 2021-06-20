@@ -16,7 +16,7 @@ DJANGO_MANAGE = python manage.py
 RUN_TEST_COMMAND = $(SHELL) $(TESTS)/run_tests.sh
 # RUN_TEST_COMMAND = $(DJANGO_MANAGE) test
 
-.PHONY : bash build check_upgrade chown clean createsuperuser help init logs \
+.PHONY : bash build check_upgrade chown clean createsuperuser destroy help init logs \
 	makemigrations migrate psql rebuild run shell start startapp stop test
 
 .DEFAULT_GOAL : help
@@ -27,47 +27,54 @@ RUN_TEST_COMMAND = $(SHELL) $(TESTS)/run_tests.sh
 bash: ## Start bash into container
 	$ $(RUN_COMMAND) $(WEB) /bin/bash
 
-build: ## Build app
+build: ## Build containers
 	$ docker-compose build $(WEB)
 
 check_upgrade: ## сheck packages version from requirements.txt
 	$ $(RUN_COMMAND) $(WEB) python -m pip list --outdated
 
-chown: ## change
+chown: ## recursively change file permissions from root to current user
 	$ sudo chown -R $(USER):$(USER) .
 
-clean: chown ##
-	$ rm  -rf $(DB)/data
-	$ docker-compose rm -sfv
+clean: chown ## Remove all generated files (.pyc, .coverage, etc).
+	$ find . -path ./db -prune -o -name "*.pyc" -exec rm -rf {} \;
+	$ find . -path ./db -prune -o -name ".coverage" -exec rm -rf {} \;
+	$ find . -path ./db -prune -o -name ".DS_Store" -exec rm -rf {} \;
+	$ find . -path ./db -prune -o -name "._DS_Store" -exec rm -rf {} \;
+	$ rm -f .coverage
 
 createsuperuser: ## Start Django shell into container
 	$ $(RUN_COMMAND) $(WEB) $(DJANGO_MANAGE) createsuperuser \
 	--noinput --username $(DJANGO_SUPERUSER_USERNAME) \
 	--email $(DJANGO_SUPERUSER_EMAIL)
 
+destroy: chown ## Delete the database and all containers
+	$ rm  -rf $(DB)/data
+	$ docker-compose rm -sfv
+
 help: ## Show this help
 	@printf "\033[33m%s:\033[0m\n" 'Available commands'
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[32m%-14s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-init: build makemigrations migrate createsuperuser##
+init: build makemigrations migrate createsuperuser ## Initializing a project from a template
 	echo -e "Initializing a project from a template ... \033[32mdone\033[m"
 
-logs: ##
+logs: ## Interactive output of logs (the web container must be running before executing this command)
 	$ docker-compose logs -f
 
-makemigrations: ## run makemigrations into container
+makemigrations: ## Run makemigrations into container
 	$ $(RUN_COMMAND) $(WEB) $(DJANGO_MANAGE) makemigrations
 
-migrate: ## run migrate into container
+migrate: ## Run migrate into container
 	$ $(RUN_COMMAND) $(WEB) $(DJANGO_MANAGE) migrate
 
-psql: ## Run psql into container (the container web must be running )
+psql: ## Run psql into container (the web container must be running before executing this command)
 	$ docker-compose exec -u postgres $(DB) psql
 
 rebuild: stop chown build ## Rebuild app container
 	echo -e "Rebuilding the container image ... \033[32mdone\033[m"
 
-run: ## Start app into container (interactive mode)
+run: ## Start web container
 	$ docker-compose up
 
 shell: ## Start Django shell into container
