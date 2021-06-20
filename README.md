@@ -9,7 +9,7 @@ Template for Django Rest Framework projects (PostgreSQL version).
 
 ## Documentation
 
-You can find out the description of the project and the user manual from the [wiki]()
+You can find out the description of the project and the user manual from the [wiki](https://github.com/vshagur/drf-postgresql-template/wiki)
 
 
 ## Built With
